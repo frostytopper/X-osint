@@ -42,6 +42,63 @@ def _cmd_config_path() -> int:
     return 0
 
 
+def _cmd_ip(address: str, include_whois: bool, as_json: bool) -> int:
+    import requests
+
+    from xosint.modules.network import get_geoip_info, get_whois_info
+
+    try:
+        result: dict[str, object] = {"geoip": get_geoip_info(address)}
+        if include_whois:
+            result["whois"] = get_whois_info(address)
+    except ValueError as exc:
+        print(f"Invalid IP address: {exc}", file=sys.stderr)
+        return 2
+    except requests.RequestException as exc:
+        print(f"Network error: {exc}", file=sys.stderr)
+        return 1
+
+    if as_json:
+        print(json.dumps(result, indent=2))
+    else:
+        geo = result["geoip"]
+        assert isinstance(geo, dict)
+        for key in ("ip", "hostname", "city", "region", "country", "loc", "org", "timezone"):
+            if key in geo:
+                print(f"{key:>10}: {geo[key]}")
+        if include_whois:
+            net = result.get("whois", {})
+            if isinstance(net, dict) and "net" in net:
+                name = net["net"].get("name", {}).get("$", "N/A")
+                print(f"{'whois_net':>10}: {name}")
+    return 0
+
+
+def _cmd_dns(
+    domain: str,
+    record_type: str,
+    nameserver: str | None,
+    as_json: bool,
+) -> int:
+    from xosint.modules.network import dns_query
+
+    try:
+        result = dns_query(domain, record_type=record_type, nameserver=nameserver)
+    except ValueError as exc:
+        print(f"Invalid nameserver IP: {exc}", file=sys.stderr)
+        return 2
+
+    if as_json:
+        print(json.dumps(result, indent=2))
+    else:
+        if result.get("error"):
+            print(f"DNS lookup failed ({result['type']} {result['domain']}): {result['error']}", file=sys.stderr)
+            return 1
+        for rec in result["records"]:
+            print(rec)
+    return 1 if result.get("error") else 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="xosint",
@@ -72,6 +129,48 @@ def build_parser() -> argparse.ArgumentParser:
     config_sub = config_parser.add_subparsers(dest="config_command")
     config_sub.add_parser("path", help="Print the config.toml path.")
 
+    ip_parser = subparsers.add_parser(
+        "ip",
+        help="Look up GeoIP (and optionally ARIN WHOIS) information for an IP address.",
+    )
+    ip_parser.add_argument("address", help="IPv4 or IPv6 address to query.")
+    ip_parser.add_argument(
+        "--whois",
+        action="store_true",
+        dest="include_whois",
+        help="Also fetch ARIN WHOIS JSON.",
+    )
+    ip_parser.add_argument(
+        "--json",
+        action="store_true",
+        dest="as_json",
+        help="Output results as JSON.",
+    )
+
+    dns_parser = subparsers.add_parser(
+        "dns",
+        help="Resolve DNS records for a domain.",
+    )
+    dns_parser.add_argument("domain", help="Domain name to resolve.")
+    dns_parser.add_argument(
+        "--type",
+        default="A",
+        dest="record_type",
+        help="DNS record type (default: A).",
+    )
+    dns_parser.add_argument(
+        "--server",
+        default=None,
+        dest="nameserver",
+        help="Optional nameserver IP (e.g. 1.1.1.1).",
+    )
+    dns_parser.add_argument(
+        "--json",
+        action="store_true",
+        dest="as_json",
+        help="Output results as JSON.",
+    )
+
     return parser
 
 
@@ -83,6 +182,10 @@ def main(argv: Sequence[str] | None = None) -> int:
         return _cmd_doctor(as_json=args.as_json)
     if args.command == "config" and args.config_command == "path":
         return _cmd_config_path()
+    if args.command == "ip":
+        return _cmd_ip(args.address, args.include_whois, args.as_json)
+    if args.command == "dns":
+        return _cmd_dns(args.domain, args.record_type, args.nameserver, args.as_json)
 
     parser.print_help()
     return 0
