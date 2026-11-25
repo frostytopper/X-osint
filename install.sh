@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# X-osint installer for Termux.
+# X-osint installer for Termux (F-Droid or GitHub build).
 #   bash install.sh              install or update
 #   bash install.sh --uninstall  remove launcher and venv
 set -euo pipefail
@@ -13,7 +13,7 @@ warn() { printf '[!] %s\n' "$*" >&2; }
 die() { printf '[x] %s\n' "$*" >&2; exit 1; }
 
 if [ -z "${PREFIX:-}" ] || [ ! -d "$PREFIX/bin" ] || [ ! -d /data/data/com.termux ]; then
-    die "This installer targets Termux. Elsewhere: python -m venv .venv && . .venv/bin/activate && pip install -e '.[dev]'"
+    die "This installer targets Termux. Elsewhere: python -m venv .venv && . .venv/bin/activate && pip install -e . pytest"
 fi
 
 LAUNCHER="$PREFIX/bin/xosint"
@@ -27,7 +27,11 @@ if [ "${1:-}" = "--uninstall" ]; then
 fi
 
 info "Installing system packages (python, git)"
-pkg install -y python git
+pkg install -y python git || die "pkg failed. Use Termux from F-Droid or GitHub (the Google Play build is deprecated), run 'pkg update', then retry."
+
+PYTHON="$PREFIX/bin/python3"
+"$PYTHON" -c 'import sys; sys.exit(0 if sys.version_info >= (3, 10) else 1)' \
+    || die "Python 3.10 or newer is required (found $("$PYTHON" -V 2>&1))."
 
 if ! command -v exiftool >/dev/null 2>&1; then
     info "Installing exiftool (needed for 'xosint metadata')"
@@ -36,7 +40,7 @@ fi
 
 info "Creating virtual environment at $VENV_DIR"
 mkdir -p "$DATA_DIR"
-"$PREFIX/bin/python3" -m venv --clear "$VENV_DIR"
+"$PYTHON" -m venv --clear "$VENV_DIR" || die "Could not create the virtual environment."
 
 info "Installing X-osint from $REPO_DIR"
 "$VENV_DIR/bin/python" -m pip install --upgrade --force-reinstall "$REPO_DIR"
