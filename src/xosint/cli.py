@@ -92,11 +92,53 @@ def _cmd_dns(
         print(json.dumps(result, indent=2))
     else:
         if result.get("error"):
-            print(f"DNS lookup failed ({result['type']} {result['domain']}): {result['error']}", file=sys.stderr)
+            print(
+                f"DNS lookup failed ({result['type']} {result['domain']}): {result['error']}",
+                file=sys.stderr,
+            )
             return 1
         for rec in result["records"]:
             print(rec)
     return 1 if result.get("error") else 0
+
+
+def _cmd_phone(
+    number: str,
+    region: str | None,
+    enrich: bool,
+    as_json: bool,
+) -> int:
+    import phonenumbers
+    import requests
+
+    from xosint.modules.phone import enrich_ipqualityscore, parse_phone_number
+
+    try:
+        result = parse_phone_number(number, default_region=region)
+        if enrich:
+            result["ipqualityscore"] = enrich_ipqualityscore(result["e164"])
+    except phonenumbers.NumberParseException as exc:
+        print(f"Invalid phone number: {exc}", file=sys.stderr)
+        return 2
+    except (RuntimeError, requests.RequestException) as exc:
+        print(f"Enrichment error: {exc}", file=sys.stderr)
+        return 1
+
+    if as_json:
+        print(json.dumps(result, indent=2))
+    else:
+        for key in (
+            "e164",
+            "international",
+            "valid",
+            "region_code",
+            "location",
+            "carrier",
+            "line_type",
+            "timezones",
+        ):
+            print(f"{key:>13}: {result.get(key)}")
+    return 0
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -171,6 +213,28 @@ def build_parser() -> argparse.ArgumentParser:
         help="Output results as JSON.",
     )
 
+    phone_parser = subparsers.add_parser(
+        "phone",
+        help="Parse and inspect a phone number (offline by default, optional --enrich).",
+    )
+    phone_parser.add_argument("number", help="Phone number (e.g. +12065550100).")
+    phone_parser.add_argument(
+        "--region",
+        default=None,
+        help="Optional default ISO region code if no country code is supplied (e.g. US).",
+    )
+    phone_parser.add_argument(
+        "--enrich",
+        action="store_true",
+        help="Query IPQualityScore using XOSINT_IPQUALITYSCORE_KEY.",
+    )
+    phone_parser.add_argument(
+        "--json",
+        action="store_true",
+        dest="as_json",
+        help="Output results as JSON.",
+    )
+
     return parser
 
 
@@ -186,6 +250,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         return _cmd_ip(args.address, args.include_whois, args.as_json)
     if args.command == "dns":
         return _cmd_dns(args.domain, args.record_type, args.nameserver, args.as_json)
+    if args.command == "phone":
+        return _cmd_phone(args.number, args.region, args.enrich, args.as_json)
 
     parser.print_help()
     return 0
