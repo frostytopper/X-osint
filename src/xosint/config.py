@@ -8,6 +8,10 @@ from pathlib import Path
 from typing import Any
 
 
+class ConfigError(RuntimeError):
+    """Raised when config.toml exists but cannot be parsed."""
+
+
 def get_config_dir() -> Path:
     """Return the XDG config directory for xosint."""
     xdg = os.environ.get("XDG_CONFIG_HOME")
@@ -25,8 +29,11 @@ def load_config() -> dict[str, Any]:
     cfg_path = get_config_file()
     if not cfg_path.is_file():
         return {}
-    with cfg_path.open("rb") as fh:
-        return tomllib.load(fh)
+    try:
+        with cfg_path.open("rb") as fh:
+            return tomllib.load(fh)
+    except tomllib.TOMLDecodeError as exc:
+        raise ConfigError(f"Invalid config file {cfg_path}: {exc}") from exc
 
 
 def get_secret(name: str) -> str | None:
