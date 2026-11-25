@@ -141,6 +141,48 @@ def _cmd_phone(
     return 0
 
 
+def _cmd_metadata(file_path: str, show_all: bool, as_json: bool) -> int:
+    from xosint.modules.metadata import (
+        ExifToolError,
+        extract_metadata,
+        summarize_metadata,
+    )
+
+    try:
+        raw = extract_metadata(file_path)
+    except FileNotFoundError as exc:
+        print(str(exc), file=sys.stderr)
+        return 2
+    except ExifToolError as exc:
+        print(f"ExifTool error: {exc}", file=sys.stderr)
+        return 1
+
+    summary = summarize_metadata(raw)
+
+    if as_json:
+        payload: dict[str, object] = {"file": file_path, "summary": summary}
+        if show_all:
+            payload["all"] = raw
+        print(json.dumps(payload, indent=2))
+        return 0
+
+    for key, value in summary.items():
+        if key == "location":
+            continue
+        print(f"{key:>13}: {value}")
+    loc = summary.get("location")
+    if loc:
+        print(f"{'location':>13}: {loc['latitude']}, {loc['longitude']}")
+        print(f"{'map':>13}: {loc['map_url']}")
+    else:
+        print(f"{'location':>13}: None")
+    if show_all:
+        print("\n--- all metadata ---")
+        for key, value in raw.items():
+            print(f"{key}: {value}")
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="xosint",
@@ -235,6 +277,24 @@ def build_parser() -> argparse.ArgumentParser:
         help="Output results as JSON.",
     )
 
+    meta_parser = subparsers.add_parser(
+        "metadata",
+        help="Extract file metadata (EXIF, PDF, ID3, ...) using ExifTool.",
+    )
+    meta_parser.add_argument("file", help="Path to the file to inspect.")
+    meta_parser.add_argument(
+        "--all",
+        action="store_true",
+        dest="show_all",
+        help="Include every raw ExifTool field, not just the summary.",
+    )
+    meta_parser.add_argument(
+        "--json",
+        action="store_true",
+        dest="as_json",
+        help="Output results as JSON.",
+    )
+
     return parser
 
 
@@ -252,6 +312,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         return _cmd_dns(args.domain, args.record_type, args.nameserver, args.as_json)
     if args.command == "phone":
         return _cmd_phone(args.number, args.region, args.enrich, args.as_json)
+    if args.command == "metadata":
+        return _cmd_metadata(args.file, args.show_all, args.as_json)
 
     parser.print_help()
     return 0
