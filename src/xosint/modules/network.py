@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import ipaddress
+import os
+from pathlib import Path
 from typing import Any
 
 import dns.exception
@@ -10,6 +12,7 @@ import dns.resolver
 import requests
 
 DEFAULT_TIMEOUT = 10
+FALLBACK_NAMESERVERS = ["1.1.1.1", "8.8.8.8"]
 
 
 def _build_session() -> requests.Session:
@@ -55,6 +58,29 @@ def get_whois_info(
     return resp.json()
 
 
+def _create_resolver(nameserver: str | None, timeout: float) -> dns.resolver.Resolver:
+    """Create a DNS resolver, falling back gracefully when /etc/resolv.conf is absent (Termux)."""
+    if nameserver:
+        resolver = dns.resolver.Resolver(configure=False)
+        resolver.nameservers = [validate_ip(nameserver)]
+        resolver.lifetime = timeout
+        return resolver
+
+    try:
+        resolver = dns.resolver.Resolver(configure=True)
+    except dns.resolver.NoResolverConfiguration:
+        resolver = dns.resolver.Resolver(configure=False)
+        prefix = os.environ.get("PREFIX")
+        termux_resolv = Path(prefix) / "etc" / "resolv.conf" if prefix else None
+        if termux_resolv and termux_resolv.is_file():
+            resolver.read_resolv_conf(str(termux_resolv))
+        else:
+            resolver.nameservers = list(FALLBACK_NAMESERVERS)
+
+    resolver.lifetime = timeout
+    return resolver
+
+
 def dns_query(
     domain: str,
     *,
@@ -63,10 +89,7 @@ def dns_query(
     timeout: float = DEFAULT_TIMEOUT,
 ) -> dict[str, Any]:
     """Resolve DNS records for a domain, optionally against a specific nameserver."""
-    resolver = dns.resolver.Resolver(configure=nameserver is None)
-    resolver.lifetime = timeout
-    if nameserver:
-        resolver.nameservers = [validate_ip(nameserver)]
+    resolver = _create_resolver(nameserver, timeout)
 
     qtype = record_type.upper()
     try:

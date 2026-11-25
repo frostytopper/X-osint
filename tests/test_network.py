@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 from unittest.mock import MagicMock
 
+import dns.resolver
 import pytest
 
 from xosint.cli import main
@@ -51,6 +52,28 @@ def test_dns_query_uses_custom_nameserver(monkeypatch) -> None:
     assert result["type"] == "A"
     assert result["records"] == ["93.184.216.34"]
     assert "error" not in result
+
+
+def test_dns_query_falls_back_without_resolv_conf(monkeypatch) -> None:
+    fake_rdata = MagicMock()
+    fake_rdata.to_text.return_value = "0 ."
+
+    fake_resolver = MagicMock()
+    fake_resolver.nameservers = []
+    fake_resolver.resolve.return_value = [fake_rdata]
+
+    def fake_resolver_factory(configure: bool = True):
+        if configure:
+            raise dns.resolver.NoResolverConfiguration("cannot open /etc/resolv.conf")
+        return fake_resolver
+
+    monkeypatch.delenv("PREFIX", raising=False)
+    monkeypatch.setattr(network.dns.resolver, "Resolver", fake_resolver_factory)
+
+    result = network.dns_query("example.com", record_type="MX")
+    assert fake_resolver.nameservers == network.FALLBACK_NAMESERVERS
+    assert result["nameserver"] == "1.1.1.1"
+    assert result["records"] == ["0 ."]
 
 
 def test_cli_dns_json(monkeypatch, capsys) -> None:
