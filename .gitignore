@@ -1,2 +1,16 @@
-.env .disclaimer_accepted
+# Secrets & local state
+.env
 .disclaimer_accepted
+api_keys.txt
+numandcage_keys.txt
+
+# Python environments & caches
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+dist/
+build/
