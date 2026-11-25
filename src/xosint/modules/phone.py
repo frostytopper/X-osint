@@ -61,7 +61,8 @@ def enrich_ipqualityscore(
     if not key:
         raise RuntimeError(
             "IPQualityScore API key not configured. "
-            "Set XOSINT_IPQUALITYSCORE_KEY or add ipqualityscore_key under [secrets] in config.toml."
+            "Set XOSINT_IPQUALITYSCORE_KEY or add ipqualityscore_key "
+            "under [secrets] in config.toml."
         )
     client = session or requests.Session()
     resp = client.get(

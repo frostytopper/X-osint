@@ -2,6 +2,7 @@
 # Project health check: lint, types, tests with coverage, dead code.
 # Run inside the dev venv. Missing tools are skipped, not fatal.
 #   bash scripts/check.sh
+# Termux: pkg install ruff ty   (pip cannot build them)
 set -u
 
 cd "$(dirname "${BASH_SOURCE[0]}")/.."
@@ -24,7 +25,7 @@ step() {
 }
 
 step "ruff (lint)" ruff check src tests
-step "mypy (types)" mypy
+step "ty (types)" ty check src
 step "pytest + coverage" pytest -q --cov --cov-report=term-missing
 step "vulture (dead code)" vulture src --min-confidence 80
 
