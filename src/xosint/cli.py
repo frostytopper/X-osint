@@ -183,6 +183,33 @@ def _cmd_metadata(file_path: str, show_all: bool, as_json: bool) -> int:
     return 0
 
 
+def _cmd_news(query: str, limit: int, as_json: bool) -> int:
+    import requests
+
+    from xosint.modules.news import search_news
+
+    try:
+        result = search_news(query, limit)
+    except ValueError as exc:
+        print(f"Invalid input: {exc}", file=sys.stderr)
+        return 2
+    except (RuntimeError, requests.RequestException) as exc:
+        print(f"News error: {exc}", file=sys.stderr)
+        return 1
+
+    if as_json:
+        print(json.dumps(result, indent=2))
+        return 0
+
+    articles = result["articles"]
+    print(f"{len(articles)} of {result['total_results']} results for {result['query']!r}")
+    for i, art in enumerate(articles, 1):
+        print(f"\n{i}. {art['title']}")
+        print(f"   {art['source']} | {art['published_at']}")
+        print(f"   {art['url']}")
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="xosint",
@@ -295,6 +322,24 @@ def build_parser() -> argparse.ArgumentParser:
         help="Output results as JSON.",
     )
 
+    news_parser = subparsers.add_parser(
+        "news",
+        help="Search recent news articles via NewsAPI (needs XOSINT_NEWSAPI_KEY).",
+    )
+    news_parser.add_argument("query", help="Search query (quote multi-word queries).")
+    news_parser.add_argument(
+        "--limit",
+        type=int,
+        default=10,
+        help="Number of articles to return, 1-100 (default: 10).",
+    )
+    news_parser.add_argument(
+        "--json",
+        action="store_true",
+        dest="as_json",
+        help="Output results as JSON.",
+    )
+
     return parser
 
 
@@ -314,6 +359,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         return _cmd_phone(args.number, args.region, args.enrich, args.as_json)
     if args.command == "metadata":
         return _cmd_metadata(args.file, args.show_all, args.as_json)
+    if args.command == "news":
+        return _cmd_news(args.query, args.limit, args.as_json)
 
     parser.print_help()
     return 0
