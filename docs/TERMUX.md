@@ -4,9 +4,11 @@
 
 ```bash
 pkg install -y git
-git clone -b dev https://github.com/frostytopper/X-osint.git
+git clone --depth 1 -b dev https://github.com/frostytopper/X-osint.git
 bash X-osint/install.sh
 ```
+
+The shallow clone (`--depth 1`) skips the full upstream history, which includes large demo media.
 
 The installer:
 
@@ -30,6 +32,7 @@ bash install.sh
 
 ```bash
 bash X-osint/install.sh --uninstall
+command -v xosint   # should print nothing
 ```
 
 This removes the launcher and the venv. Your config in `~/.config/xosint` is left in place.
