@@ -14,7 +14,7 @@ Last updated: 2026-11-25. Branch: `dev`. `master` is the untouched upstream base
 ## Source project
 
 - Upstream: `TermuxHackz/X-osint` (single 116 KB `xosint` script, `setup.sh`, Flask/Tkinter/Stripe baggage).
-- Fork: `frostytopper/X-osint`. Rewrite lives in `src/xosint/` as a modular package. The legacy `xosint` script and `setup.sh` are still in the tree, unmodified and unused.
+- Fork: `frostytopper/X-osint`. Rewrite lives in `src/xosint/` as a modular package. The legacy `xosint` script and `setup.sh` are still in the tree, unmodified and unused, unless a later commit removed them.
 
 ## Current state of `dev`
 
@@ -30,20 +30,20 @@ Last updated: 2026-11-25. Branch: `dev`. `master` is the untouched upstream base
 | metadata | Runs `exiftool -j -n -G`. Never auto-installs. Prints an OpenStreetMap link, never opens a browser |
 | news | NewsAPI `/v2/everything`, key from `XOSINT_NEWSAPI_KEY`, sent in a header. Fails clearly if absent. Live behaviour untested (needs the user's own key) |
 | Installer | `install.sh`: Termux only, no sudo, checks Python >= 3.10, venv at `~/.local/share/xosint/venv`, launcher symlink at `$PREFIX/bin/xosint`, `--uninstall`. Docs in `docs/TERMUX.md` |
-| Tests | `tests/`, offline and mocked. 34 expected after the registry refactor |
+| Tests | `tests/`, offline and mocked. 34 tests |
 
 ## Verified on the Pixel
 
-- `pytest`: 30 passed before the registry refactor (22 earlier plus 8 news tests).
-- After the refactor: `xosint news "x" --limit 0` printed the limit error with exit 2, and `xosint doctor` ran correctly. The pytest count after the refactor has not been reported.
+- `pytest`: 34 passed after the registry refactor.
+- `xosint news "x" --limit 0` printed the limit error with exit 2, and `xosint doctor` ran correctly.
+- `xosint --help` displays correctly, from the updated installer.
 - `ip`, `dns` (with `--server`) and the resolver fallback passed.
 - `xosint metadata` works on `PXL_20261125_172749268.RAW-01.jpg` (ExifTool 13.64 via `pkg install exiftool`): camera fields correct, `location: None`.
 - `install.sh` (previous version): fresh install, re-run update, and `--uninstall` all passed.
 
 ## Not yet verified
 
-- `pytest` after the registry refactor (expect 34).
-- The updated `install.sh` (Python version check and new error messages): re-run install and uninstall.
+- `--uninstall` and `command -v xosint` printing nothing, with the updated `install.sh`. The new Python version check and error messages have only been exercised on the success path.
 - GPS extraction on a photo that has GPS. The no-location result has not been checked with `--json --all` to confirm the tags are absent.
 - `xosint dns example.com --type MX` without `--server`, after the fallback fix.
 - `xosint news` against the live API.
@@ -58,14 +58,19 @@ Last updated: 2026-11-25. Branch: `dev`. `master` is the untouched upstream base
 - `~/storage/downloads` maps to the shared Download folder after `termux-setup-storage`.
 - Leftover clones may exist at `~/xosint-test` and `~/xosint-upstream`. Safe to delete.
 
+## Decisions made
+
+- `master` stays as the untouched upstream mirror. `dev` is the working line. Do not merge the rewrite into `master`.
+- The legacy `xosint` script and `setup.sh` are removed from `dev` only. They remain on `master`.
+- The installer never runs `pkg upgrade` or `pkg update`. It points to `pkg update` only when `pkg install` fails.
+- Do not copy the NewsAPI key hardcoded in upstream `newsOsint()`. It is a shared key, and its quota exhaustion is upstream issue #98.
+- Dropped on purpose: self-update via `git reset --hard`, `stripe`, Tkinter GUI, sudo auto-installs.
+
 ## Next steps
 
-1. User: run `pytest -q` in the dev venv (expect 34), then re-run `bash install.sh` and `bash install.sh --uninstall` to verify the updated installer.
+1. User: run `bash install.sh --uninstall` then `command -v xosint` (expect no output).
 2. Upstream features not yet ported are out of scope for this phase: reverse image search, network and Wi-Fi mapper plus Flask templates, code analysis, speed test, ping, VIN, email, GitHub email, Google dorks. The upstream file was only readable up to the phone module (connector truncation), so VIN, email, GitHub email and Google dorks were never reviewed.
-3. Do not copy the NewsAPI key hardcoded in upstream `newsOsint()`. It is a shared key, and its quota exhaustion is upstream issue #98.
-4. Drop on purpose: self-update via `git reset --hard`, `stripe`, Tkinter GUI, sudo auto-installs.
-5. Performance, after install work (now done): measure import time first with `python -X importtime`. Then a shared `requests.Session`, a threadpool for batch lookups, and a small TTL cache.
-6. Eventually: merge `dev` into `master`, or keep `master` as an upstream mirror. Decide with the user.
+3. Performance, only if wanted: measure import time first with `python -X importtime`. Then a shared `requests.Session`, a threadpool for batch lookups, and a small TTL cache.
 
 ## Upstream issues worth remembering
 
