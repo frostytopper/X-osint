@@ -35,6 +35,15 @@ def test_get_secret_env_override(monkeypatch) -> None:
     assert get_secret("newsapi_key") == "test-key-123"
 
 
+def test_get_secret_from_config_file(monkeypatch, tmp_path: Path) -> None:
+    monkeypatch.delenv("XOSINT_NEWSAPI_KEY", raising=False)
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path))
+    cfg = tmp_path / "xosint" / "config.toml"
+    cfg.parent.mkdir(parents=True)
+    cfg.write_text('[secrets]\nnewsapi_key = "from-file"\n')
+    assert get_secret("newsapi_key") == "from-file"
+
+
 def test_every_registered_command_in_help(capsys) -> None:
     with pytest.raises(SystemExit) as exc:
         main(["--help"])

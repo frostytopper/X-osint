@@ -3,13 +3,9 @@
 from __future__ import annotations
 
 import os
+import tomllib
 from pathlib import Path
 from typing import Any
-
-try:
-    import tomllib
-except ModuleNotFoundError:  # Python 3.10 fallback
-    tomllib = None  # type: ignore[assignment]
 
 
 def get_config_dir() -> Path:
@@ -27,7 +23,7 @@ def get_config_file() -> Path:
 def load_config() -> dict[str, Any]:
     """Load config.toml if present, returning an empty dict otherwise."""
     cfg_path = get_config_file()
-    if not cfg_path.is_file() or tomllib is None:
+    if not cfg_path.is_file():
         return {}
     with cfg_path.open("rb") as fh:
         return tomllib.load(fh)

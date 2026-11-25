@@ -30,8 +30,8 @@ info "Installing system packages (python, git)"
 pkg install -y python git || die "pkg failed. Use Termux from F-Droid or GitHub (the Google Play build is deprecated), run 'pkg update', then retry."
 
 PYTHON="$PREFIX/bin/python3"
-"$PYTHON" -c 'import sys; sys.exit(0 if sys.version_info >= (3, 10) else 1)' \
-    || die "Python 3.10 or newer is required (found $("$PYTHON" -V 2>&1))."
+"$PYTHON" -c 'import sys; sys.exit(0 if sys.version_info >= (3, 11) else 1)' \
+    || die "Python 3.11 or newer is required (found $("$PYTHON" -V 2>&1))."
 
 if ! command -v exiftool >/dev/null 2>&1; then
     info "Installing exiftool (needed for 'xosint metadata')"
